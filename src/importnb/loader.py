@@ -21,36 +21,19 @@ from importlib.util import spec_from_loader
 from inspect import signature
 from pathlib import Path
 
-from .decoder2 import LineCacheNotebookDecoder, quote
+from .decoder import LineCacheNotebookDecoder, quote
 from .docstrings import update_docstring
 from .finder import FuzzyFinder, FuzzySpec, get_loader_details
 from .ipython_extension import load_ipython_extension, unload_ipython_extension
 
+from importlib._bootstrap import _requires_builtin
+from importlib._bootstrap_external import decode_source, FileFinder
+from importlib.util import module_from_spec
+from importlib._bootstrap import _init_module_attrs
+from importlib.util import LazyLoader
+
+
 _GTE38 = sys.version_info.major == 3 and sys.version_info.minor >= 8
-
-if _GTE38:
-    from importlib._bootstrap import _load_unlocked, _requires_builtin
-else:
-    from importlib._bootstrap import _installed_safely, _requires_builtin
-
-
-try:
-    from importlib._bootstrap_external import decode_source, FileFinder
-    from importlib.util import module_from_spec
-    from importlib._bootstrap import _init_module_attrs
-    from importlib.util import LazyLoader
-except ImportError:
-    # python 3.4
-    from importlib._bootstrap import _SpecMethods
-    from importlib.util import decode_source
-    from importlib.machinery import FileFinder
-
-    def module_from_spec(spec):
-        return _SpecMethods(spec).create()
-
-    def _init_module_attrs(spec, module):
-        return _SpecMethods(spec).init_module_attrs(module)
-
 
 try:
     import IPython
@@ -126,7 +109,7 @@ class ImportLibMixin(SourceFileLoader):
     `get_data` assures consistent line numbers between the file s representatio and source."""
 
     def create_module(self, spec):
-        module = ModuleType(spec.name)
+        module = ModuleType(str(spec.name))
         _init_module_attrs(spec, module)
         if isinstance(spec, FuzzySpec):
             sys.modules[spec.alias] = module
@@ -137,11 +120,12 @@ class ImportLibMixin(SourceFileLoader):
     def decode(self):
         return decode_source(super().get_data(self.path))
 
+    def code(self, object):
+        return object
+
     def get_data(self, path):
         """Needs to return the string source for the module."""
-        return LineCacheNotebookDecoder(
-            code=self.code, raw=self.raw, markdown=self.markdown
-        ).decode(self.decode(), self.path)
+        return self.code(self.decode())
 
     @classmethod
     @_requires_builtin
@@ -194,6 +178,14 @@ class NotebookBaseLoader(ImportLibMixin, FinderContextManager):
         """Permit fuzzy finding of files with special characters."""
         return self._fuzzy and FuzzyFinder or super().finder
 
+    def get_data(self, path):
+        """Needs to return the string source for the module."""
+        if path.endswith(".ipynb"):
+            return LineCacheNotebookDecoder(
+                code=self.code, raw=self.raw, markdown=self.markdown
+            ).decode(self.decode(), self.path)
+        return super().get_data(path)
+
 
 class FileModuleSpec(ModuleSpec):
     def __init__(self, *args, **kwargs):
@@ -218,18 +210,11 @@ class FromFileMixin:
 
         > assert Notebook.load('loader.ipynb')
         """
-        name = main and "__main__" or Path(filename).stem
+        name = main and "__main__" or Path(filename)
         loader = cls(name, str(filename), **kwargs)
         spec = FileModuleSpec(name, loader, origin=loader.path)
-        module = module_from_spec(spec)
-        if _GTE38:
-            module = _load_unlocked(spec)
-        else:
-            with ExitStack() as stack:
-                loader.name != "__main__" and stack.enter_context(
-                    _installed_safely(module)
-                )
-                loader.exec_module(module)
+        module = loader.create_module(spec)
+        loader.exec_module(module)
         return module
 
 
