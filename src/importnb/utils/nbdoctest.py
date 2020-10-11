@@ -1,11 +1,9 @@
 # coding: utf-8
-from doctest import OPTIONFLAGS_BY_NAME, testfile, testmod, FAIL_FAST
-import os, argparse
+import argparse
+import os
+from doctest import FAIL_FAST, OPTIONFLAGS_BY_NAME, testfile, testmod
 
-try:
-    from ..loader import Notebook
-except:
-    from importnb import Notebook
+from ..loader import Notebook
 
 
 def _test():
@@ -55,7 +53,9 @@ def _test():
             # It is a module -- insert its dir into sys.path and try to
             # import it. If it is part of a package, that possibly
             # won't work because of package imports.
-            failures, _ = testmod(Notebook.load(filename), verbose=verbose, optionflags=options)
+            failures, _ = testmod(
+                Notebook.load(filename), verbose=verbose, optionflags=options
+            )
         else:
             failures, _ = testfile(
                 filename, module_relative=False, verbose=verbose, optionflags=options

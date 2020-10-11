@@ -1,9 +1,12 @@
 # coding: utf-8
-from IPython import paths, get_ipython
-from IPython.core import profiledir
-from pathlib import Path
-import json, ast
+import ast
+import json
 import os
+import sys
+from pathlib import Path
+
+from IPython import get_ipython, paths
+from IPython.core import profiledir
 
 
 def get_config(profile="default"):
@@ -12,7 +15,9 @@ def get_config(profile="default"):
         profile = profile_dir.find_profile_dir_by_name(paths.get_ipython_dir(), profile)
     except profiledir.ProfileDirError:
         os.makedirs(paths.get_ipython_dir(), exist_ok=True)
-        profile = profile_dir.create_profile_dir_by_name(paths.get_ipython_dir(), profile)
+        profile = profile_dir.create_profile_dir_by_name(
+            paths.get_ipython_dir(), profile
+        )
     return Path(profile.location, "ipython_config.json")
 
 
@@ -31,9 +36,6 @@ def load_config():
         config["InteractiveShellApp"]["extensions"] = []
 
     return config, location
-
-
-import sys
 
 
 def install(project="importnb"):
@@ -57,7 +59,9 @@ def uninstall(project="importnb"):
     config, location = load_config()
     projects = sys.argv[1:] or [project]
     config["InteractiveShellApp"]["extensions"] = [
-        ext for ext in config["InteractiveShellApp"]["extensions"] if ext not in projects
+        ext
+        for ext in config["InteractiveShellApp"]["extensions"]
+        if ext not in projects
     ]
 
     with location.open("w") as file:

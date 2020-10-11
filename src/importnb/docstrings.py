@@ -12,7 +12,9 @@ import ast
     >>> assert isinstance(test_update, ast.Attribute)
 """
 
-create_test = ast.parse("""__test__ = globals().get('__test__', {})""", mode="single").body[0]
+create_test = ast.parse(
+    """__test__ = globals().get('__test__', {})""", mode="single"
+).body[0]
 test_update = ast.parse("""__test__.update""", mode="single").body[0].value
 str_nodes = (ast.Str,)
 
@@ -44,7 +46,8 @@ class TestStrings(ast.NodeTransformer):
                             func=test_update,
                             args=[
                                 ast.Dict(
-                                    keys=[ast.Str("string-{}".format(node.lineno))], values=[node]
+                                    keys=[ast.Str("string-{}".format(node.lineno))],
+                                    values=[node],
                                 )
                             ],
                             keywords=[],
@@ -112,11 +115,3 @@ def markdown_docstring(nodes, node):
 
 def str_expr(node):
     return isinstance(node, ast.Expr) and isinstance(node.value, ast.Str)
-
-
-if __name__ == "__main__":
-    try:
-        from utils.export import export
-    except:
-        from .utils.export import export
-    export("docstrings.ipynb", "../docstrings.py")
